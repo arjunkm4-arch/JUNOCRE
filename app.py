@@ -82,7 +82,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 @app.route("/")
 def index():
-    return send_from_directory(BASE_DIR, "index.html")
+    html_path = os.path.join(os.getcwd(), "index.html")
+    with open(html_path) as f:
+        return f.read()
 
 @app.route("/api/properties")
 def get_properties():
