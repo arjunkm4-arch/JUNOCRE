@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>OM Platform – Houston Retail</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;
+  --text:#e6edf3;--muted:#7d8590;--accent:#2f81f7;--accent2:#388bfd;
+  --green:#3fb950;--yellow:#d29922;--red:#f85149;
+  --radius:8px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── NAV ── */
+nav{display:flex;align-items:center;gap:12px;padding:0 16px;height:52px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;z-index:100}
+.logo{font-weight:700;font-size:1rem;color:var(--text);display:flex;align-items:center;gap:8px}
+.logo span{background:var(--accent);color:#fff;border-radius:5px;padding:2px 8px;font-size:.75rem}
+.nav-count{color:var(--muted);font-size:.82rem}
+nav .spacer{flex:1}
+.btn{padding:6px 14px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:.82rem;cursor:pointer;transition:.15s;white-space:nowrap}
+.btn:hover{background:var(--border);border-color:var(--accent)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent2);border-color:var(--accent2)}
+.btn-icon{padding:6px 10px;font-size:1rem}
+
+/* ── LAYOUT ── */
+.workspace{display:flex;flex:1;overflow:hidden}
+
+/* ── SIDEBAR ── */
+#sidebar{width:320px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:width .2s}
+#sidebar.collapsed{width:0}
+.sidebar-header{padding:12px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.search-wrap{position:relative}
+.search-wrap input{width:100%;padding:7px 12px 7px 32px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:.83rem;outline:none}
+.search-wrap input:focus{border-color:var(--accent)}
+.search-wrap .si{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.85rem;pointer-events:none}
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+select.filter{flex:1;min-width:90px;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:.78rem;outline:none;cursor:pointer}
+select.filter:focus{border-color:var(--accent)}
+.prop-list{flex:1;overflow-y:auto;padding:6px 0}
+.prop-card{padding:11px 14px;border-bottom:1px solid var(--border)22;cursor:pointer;transition:.12s}
+.prop-card:hover{background:var(--surface2)}
+.prop-card.active{background:var(--accent)18;border-left:3px solid var(--accent)}
+.prop-card .pname{font-size:.85rem;font-weight:600;color:var(--text);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prop-card .paddress{font-size:.74rem;color:var(--muted);margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prop-card .ptags{display:flex;gap:5px;flex-wrap:wrap}
+.tag{font-size:.7rem;padding:1px 7px;border-radius:20px;font-weight:600}
+.tag-green{background:#3fb95022;color:var(--green);border:1px solid #3fb95044}
+.tag-blue{background:#2f81f722;color:var(--accent);border:1px solid #2f81f744}
+.tag-yellow{background:#d2992222;color:var(--yellow);border:1px solid #d2992244}
+.tag-red{background:#f8514922;color:var(--red);border:1px solid #f8514944}
+.no-results{padding:32px 14px;text-align:center;color:var(--muted);font-size:.85rem}
+
+/* ── MAP ── */
+#map{flex:1;z-index:0}
+.leaflet-control-attribution{display:none!important}
+.leaflet-popup-content-wrapper{background:var(--surface)!important;color:var(--text)!important;border:1px solid var(--border)!important;border-radius:10px!important;box-shadow:0 8px 30px rgba(0,0,0,.6)!important}
+.leaflet-popup-tip{background:var(--surface)!important}
+.leaflet-popup-close-button{color:var(--muted)!important}
+.pop-name{font-size:.95rem;font-weight:700;color:var(--accent);margin-bottom:4px}
+.pop-addr{font-size:.76rem;color:var(--muted);margin-bottom:8px}
+.pop-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px}
+.pop-item{font-size:.76rem}
+.pop-label{color:var(--muted)}
+.pop-val{color:var(--text);font-weight:600}
+.pop-actions{margin-top:10px;display:flex;gap:6px}
+
+/* ── DETAIL PANEL ── */
+#detail{width:0;overflow:hidden;background:var(--surface);border-left:1px solid var(--border);transition:width .2s;flex-shrink:0}
+#detail.open{width:340px}
+.detail-inner{width:340px;padding:16px;overflow-y:auto;height:100%}
+.detail-close{float:right;background:none;border:none;color:var(--muted);font-size:1.1rem;cursor:pointer;padding:0;margin-top:-2px}
+.detail-close:hover{color:var(--text)}
+.detail-name{font-size:1.05rem;font-weight:700;margin-bottom:4px;margin-right:24px;line-height:1.3}
+.detail-addr{font-size:.8rem;color:var(--muted);margin-bottom:14px}
+.detail-section{margin-bottom:16px}
+.detail-section h4{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px;font-weight:600}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.metric-box{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px}
+.metric-label{font-size:.7rem;color:var(--muted);margin-bottom:2px}
+.metric-val{font-size:1.05rem;font-weight:700;color:var(--text)}
+.metric-val.cap{color:var(--green)}
+.metric-val.price{color:var(--accent)}
+.edit-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.edit-row label{font-size:.78rem;color:var(--muted);width:90px;flex-shrink:0}
+.edit-row input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:.8rem;outline:none}
+.edit-row input:focus{border-color:var(--accent)}
+.btn-save{width:100%;margin-top:4px}
+.btn-danger{border-color:var(--red)44;color:var(--red);width:100%;margin-top:6px}
+.btn-danger:hover{background:var(--red)22}
+
+/* ── UPLOAD MODAL ── */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:480px;max-width:95vw;padding:24px}
+.modal h2{font-size:1.05rem;font-weight:700;margin-bottom:4px}
+.modal p{font-size:.82rem;color:var(--muted);margin-bottom:18px}
+.dropzone{border:2px dashed var(--border);border-radius:var(--radius);padding:40px 20px;text-align:center;cursor:pointer;transition:.2s;background:var(--surface2)}
+.dropzone:hover,.dropzone.dragover{border-color:var(--accent);background:var(--accent)0a}
+.dropzone .dz-icon{font-size:2rem;margin-bottom:8px}
+.dropzone .dz-text{font-size:.85rem;color:var(--muted)}
+.dropzone .dz-text strong{color:var(--accent)}
+.upload-list{margin-top:14px;display:flex;flex-direction:column;gap:8px;max-height:200px;overflow-y:auto}
+.upload-item{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;display:flex;align-items:center;gap:10px}
+.upload-item .fname{flex:1;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.upload-item .fstatus{font-size:.75rem;font-weight:600}
+.fstatus.pending{color:var(--muted)}
+.fstatus.processing{color:var(--yellow)}
+.fstatus.done{color:var(--green)}
+.fstatus.error{color:var(--red)}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;margin-top:6px;overflow:hidden}
+.progress-fill{height:100%;background:var(--accent);transition:width .3s;border-radius:2px}
+.modal-actions{display:flex;gap:8px;margin-top:18px;justify-content:flex-end}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+.toast-item{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;font-size:.83rem;max-width:300px;animation:slideIn .2s ease;box-shadow:0 4px 20px rgba(0,0,0,.4)}
+.toast-item.success{border-color:var(--green)44;color:var(--green)}
+.toast-item.error{border-color:var(--red)44;color:var(--red)}
+@keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">🏢 <span>OM</span> Platform</div>
+  <span class="nav-count" id="nav-count">Loading…</span>
+  <div class="spacer"></div>
+  <button class="btn btn-icon" onclick="toggleSidebar()" title="Toggle list">☰</button>
+  <button class="btn btn-primary" onclick="openUpload()">+ Add OM</button>
+</nav>
+
+<div class="workspace">
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <div class="search-wrap">
+        <span class="si">🔍</span>
+        <input type="text" id="search" placeholder="Search properties…" oninput="applyFilters()"/>
+      </div>
+      <div class="filters">
+        <select class="filter" id="f-city" onchange="applyFilters()">
+          <option value="">All Cities</option>
+        </select>
+        <select class="filter" id="f-cap" onchange="applyFilters()">
+          <option value="">Any Cap Rate</option>
+          <option value="0-5">Under 5%</option>
+          <option value="5-6">5–6%</option>
+          <option value="6-7">6–7%</option>
+          <option value="7-8">7–8%</option>
+          <option value="8-99">8%+</option>
+        </select>
+        <select class="filter" id="f-price" onchange="applyFilters()">
+          <option value="">Any Price</option>
+          <option value="0-3000000">Under $3M</option>
+          <option value="3000000-7000000">$3M–$7M</option>
+          <option value="7000000-15000000">$7M–$15M</option>
+          <option value="15000000-999999999">$15M+</option>
+        </select>
+      </div>
+    </div>
+    <div class="prop-list" id="prop-list"></div>
+  </div>
+
+  <!-- MAP -->
+  <div id="map"></div>
+
+  <!-- DETAIL PANEL -->
+  <div id="detail">
+    <div class="detail-inner" id="detail-inner"></div>
+  </div>
+</div>
+
+<!-- UPLOAD MODAL -->
+<div class="modal-backdrop" id="upload-modal" style="display:none" onclick="handleBackdropClick(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h2>Add Offering Memorandum</h2>
+    <p>Upload PDF files — deal data (address, price, cap rate, NOI, SF) is extracted automatically.</p>
+    <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()"
+         ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+      <div class="dz-icon">📄</div>
+      <div class="dz-text"><strong>Click to browse</strong> or drag &amp; drop PDFs here</div>
+    </div>
+    <input type="file" id="file-input" accept=".pdf" multiple style="display:none" onchange="handleFiles(this.files)"/>
+    <div class="upload-list" id="upload-list"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeUpload()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ── STATE ────────────────────────────────────────────────────────────────────
+let allProps = [];
+let filtered = [];
+let markers = {};
+let activeId = null;
+let map;
+
+// ── MAP INIT ─────────────────────────────────────────────────────────────────
+map = L.map('map', {zoomControl: true}).setView([29.82, -95.45], 10);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution:'© OpenStreetMap © CARTO', maxZoom:19
+}).addTo(map);
+
+function makeIcon(active=false) {
+  const c = active ? '#f0a732' : '#2f81f7';
+  return L.divIcon({
+    className:'',
+    html:`<svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="14" cy="34" rx="6" ry="2.2" fill="rgba(0,0,0,0.25)"/>
+      <path d="M14 2C8.477 2 4 6.477 4 12c0 8 10 22 10 22s10-14 10-22C24 6.477 19.523 2 14 2z"
+        fill="${c}" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+      <circle cx="14" cy="12" r="4.5" fill="white" fill-opacity="0.9"/>
+    </svg>`,
+    iconSize:[28,36], iconAnchor:[14,36], popupAnchor:[0,-36]
+  });
+}
+
+// ── DATA ─────────────────────────────────────────────────────────────────────
+async function loadData() {
+  try {
+    const res = await fetch('/api/properties');
+    allProps = await res.json();
+    buildCityFilter();
+    applyFilters();
+    renderMarkers();
+    document.getElementById('nav-count').textContent = `${allProps.length} properties`;
+  } catch(e) {
+    console.error(e);
+    toast('Failed to load properties', 'error');
+  }
+}
+
+function buildCityFilter() {
+  const cities = [...new Set(allProps.map(p => extractCity(p.address)).filter(Boolean))].sort();
+  const sel = document.getElementById('f-city');
+  sel.innerHTML = '<option value="">All Cities</option>' +
+    cities.map(c => `<option value="${c}">${c}</option>`).join('');
+}
+
+function extractCity(addr='') {
+  const m = addr.match(/,\s*([^,]+),\s*TX/i);
+  return m ? m[1].trim() : '';
+}
+
+// ── FILTERS ───────────────────────────────────────────────────────────────────
+function applyFilters() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const city = document.getElementById('f-city').value;
+  const capRange = document.getElementById('f-cap').value;
+  const priceRange = document.getElementById('f-price').value;
+
+  filtered = allProps.filter(p => {
+    if (q && !p.name.toLowerCase().includes(q) && !(p.address||'').toLowerCase().includes(q)) return false;
+    if (city && extractCity(p.address) !== city) return false;
+    if (capRange) {
+      const [lo,hi] = capRange.split('-').map(Number);
+      if (!p.cap_rate || p.cap_rate < lo || p.cap_rate >= hi) return false;
+    }
+    if (priceRange) {
+      const [lo,hi] = priceRange.split('-').map(Number);
+      if (!p.price || p.price < lo || p.price >= hi) return false;
+    }
+    return true;
+  });
+
+  renderList();
+  updateMarkerVisibility();
+}
+
+// ── LIST ──────────────────────────────────────────────────────────────────────
+function renderList() {
+  const el = document.getElementById('prop-list');
+  if (!filtered.length) {
+    el.innerHTML = '<div class="no-results">No properties match your filters.</div>';
+    return;
+  }
+  el.innerHTML = filtered.map(p => `
+    <div class="prop-card${p.id===activeId?' active':''}" onclick="selectProp('${p.id}')">
+      <div class="pname">${esc(p.name)}</div>
+      <div class="paddress">📍 ${esc(p.address||'Address not extracted')}</div>
+      <div class="ptags">
+        ${p.price_display ? `<span class="tag tag-blue">${esc(p.price_display)}</span>` : ''}
+        ${p.cap_rate ? `<span class="tag tag-green">${p.cap_rate}% Cap</span>` : ''}
+        ${p.sf_display ? `<span class="tag tag-yellow">${esc(p.sf_display)}</span>` : ''}
+        ${p.occupancy ? `<span class="tag ${p.occupancy>=95?'tag-green':'tag-yellow'}">${p.occupancy}% Leased</span>` : ''}
+        ${!p.lat ? '<span class="tag tag-red">No coords</span>' : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── MARKERS ───────────────────────────────────────────────────────────────────
+function renderMarkers() {
+  // Clear old
+  Object.values(markers).forEach(m => map.removeLayer(m));
+  markers = {};
+
+  allProps.forEach(p => {
+    if (!p.lat || !p.lon) return;
+    const m = L.marker([p.lat, p.lon], {icon: makeIcon(false)});
+    m.bindPopup(buildPopup(p), {maxWidth:280});
+    m.on('click', () => selectProp(p.id));
+    m.addTo(map);
+    markers[p.id] = m;
+  });
+}
+
+function updateMarkerVisibility() {
+  const visibleIds = new Set(filtered.map(p => p.id));
+  Object.entries(markers).forEach(([id, m]) => {
+    if (visibleIds.has(id)) {
+      if (!map.hasLayer(m)) m.addTo(map);
+    } else {
+      if (map.hasLayer(m)) map.removeLayer(m);
+    }
+  });
+}
+
+function buildPopup(p) {
+  return `
+    <div class="pop-name">${esc(p.name)}</div>
+    <div class="pop-addr">📍 ${esc(p.address||'')}</div>
+    <div class="pop-grid">
+      ${p.price_display ? `<div class="pop-item"><div class="pop-label">Price</div><div class="pop-val">${esc(p.price_display)}</div></div>` : ''}
+      ${p.cap_rate ? `<div class="pop-item"><div class="pop-label">Cap Rate</div><div class="pop-val">${p.cap_rate}%</div></div>` : ''}
+      ${p.noi_display ? `<div class="pop-item"><div class="pop-label">NOI</div><div class="pop-val">${esc(p.noi_display)}</div></div>` : ''}
+      ${p.sf_display ? `<div class="pop-item"><div class="pop-label">Size</div><div class="pop-val">${esc(p.sf_display)}</div></div>` : ''}
+      ${p.occupancy ? `<div class="pop-item"><div class="pop-label">Occupancy</div><div class="pop-val">${p.occupancy}%</div></div>` : ''}
+      ${p.year_built ? `<div class="pop-item"><div class="pop-label">Year Built</div><div class="pop-val">${p.year_built}</div></div>` : ''}
+    </div>
+    <div class="pop-actions">
+      <button class="btn btn-primary" style="font-size:.76rem;padding:4px 10px" onclick="selectProp('${p.id}')">Details</button>
+    </div>
+  `;
+}
+
+// ── SELECT / DETAIL ───────────────────────────────────────────────────────────
+function selectProp(id) {
+  activeId = id;
+  const p = allProps.find(x => x.id === id);
+  if (!p) return;
+
+  renderList();
+
+  // Fly to marker
+  if (p.lat && p.lon) {
+    map.flyTo([p.lat, p.lon], 15, {duration:0.7});
+    if (markers[id]) {
+      Object.entries(markers).forEach(([mid,m]) => m.setIcon(makeIcon(mid===id)));
+      setTimeout(()=>markers[id]?.openPopup(), 750);
+    }
+  }
+
+  // Detail panel
+  const detail = document.getElementById('detail');
+  const inner = document.getElementById('detail-inner');
+  detail.classList.add('open');
+
+  inner.innerHTML = `
+    <button class="detail-close" onclick="closeDetail()">✕</button>
+    <div class="detail-name">${esc(p.name)}</div>
+    <div class="detail-addr">📍 ${esc(p.address||'Address not extracted')}</div>
+
+    <div class="detail-section">
+      <h4>Deal Metrics</h4>
+      <div class="metrics">
+        ${metricBox('Price', p.price_display||'—', 'price')}
+        ${metricBox('Cap Rate', p.cap_rate ? p.cap_rate+'%' : '—', 'cap')}
+        ${metricBox('NOI', p.noi_display||'—', '')}
+        ${metricBox('Size', p.sf_display||'—', '')}
+        ${metricBox('Occupancy', p.occupancy ? p.occupancy+'%' : '—', '')}
+        ${metricBox('Year Built', p.year_built||'—', '')}
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <h4>Edit Details</h4>
+      <div class="edit-row"><label>Name</label><input id="e-name" value="${esc(p.name)}"/></div>
+      <div class="edit-row"><label>Address</label><input id="e-address" value="${esc(p.address||'')}"/></div>
+      <div class="edit-row"><label>Price ($)</label><input id="e-price" type="number" value="${p.price||''}"/></div>
+      <div class="edit-row"><label>Cap Rate (%)</label><input id="e-cap" type="number" step="0.01" value="${p.cap_rate||''}"/></div>
+      <div class="edit-row"><label>NOI ($)</label><input id="e-noi" type="number" value="${p.noi||''}"/></div>
+      <div class="edit-row"><label>Size (SF)</label><input id="e-sf" type="number" value="${p.sf||''}"/></div>
+      <div class="edit-row"><label>Occupancy (%)</label><input id="e-occ" type="number" value="${p.occupancy||''}"/></div>
+      <button class="btn btn-primary btn-save" onclick="saveProp('${id}')">💾 Save Changes</button>
+      <button class="btn btn-danger" onclick="deleteProp('${id}')">🗑 Remove Property</button>
+    </div>
+
+    ${p.added ? `<div style="font-size:.72rem;color:var(--muted);margin-top:8px">Added: ${p.added}</div>` : ''}
+  `;
+}
+
+function metricBox(label, val, cls) {
+  return `<div class="metric-box"><div class="metric-label">${label}</div><div class="metric-val ${cls}">${val}</div></div>`;
+}
+
+function closeDetail() {
+  document.getElementById('detail').classList.remove('open');
+  activeId = null;
+  Object.values(markers).forEach(m => m.setIcon(makeIcon(false)));
+  renderList();
+}
+
+async function saveProp(id) {
+  const updates = {
+    name: document.getElementById('e-name').value,
+    address: document.getElementById('e-address').value,
+    price: Number(document.getElementById('e-price').value)||null,
+    cap_rate: Number(document.getElementById('e-cap').value)||null,
+    noi: Number(document.getElementById('e-noi').value)||null,
+    sf: Number(document.getElementById('e-sf').value)||null,
+    occupancy: Number(document.getElementById('e-occ').value)||null,
+  };
+  if (updates.price) updates.price_display = '$'+(updates.price>=1e6?(updates.price/1e6).toFixed(2)+'M':updates.price.toLocaleString());
+  if (updates.sf) updates.sf_display = updates.sf.toLocaleString()+' SF';
+  if (updates.noi) updates.noi_display = '$'+updates.noi.toLocaleString();
+
+  await fetch(`/api/properties/${id}`, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(updates)});
+  Object.assign(allProps.find(p=>p.id===id)||{}, updates);
+  buildCityFilter();
+  applyFilters();
+  selectProp(id);
+  toast('Saved!', 'success');
+}
+
+async function deleteProp(id) {
+  if (!confirm('Remove this property from the platform?')) return;
+  await fetch(`/api/properties/${id}`, {method:'DELETE'});
+  allProps = allProps.filter(p=>p.id!==id);
+  closeDetail();
+  if (markers[id]) { map.removeLayer(markers[id]); delete markers[id]; }
+  buildCityFilter();
+  applyFilters();
+  document.getElementById('nav-count').textContent = `${allProps.length} properties`;
+  toast('Property removed', 'success');
+}
+
+// ── UPLOAD ────────────────────────────────────────────────────────────────────
+function openUpload() { document.getElementById('upload-modal').style.display='flex'; }
+function closeUpload() { document.getElementById('upload-modal').style.display='none'; }
+function handleBackdropClick(e) { if(e.target.id==='upload-modal') closeUpload(); }
+
+function onDragOver(e) { e.preventDefault(); document.getElementById('dropzone').classList.add('dragover'); }
+function onDragLeave(e) { document.getElementById('dropzone').classList.remove('dragover'); }
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropzone').classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+}
+
+function handleFiles(files) {
+  [...files].forEach(uploadFile);
+}
+
+async function uploadFile(file) {
+  const list = document.getElementById('upload-list');
+  const itemId = 'u-'+Math.random().toString(36).slice(2);
+  list.insertAdjacentHTML('beforeend', `
+    <div id="${itemId}" class="upload-item">
+      <span style="font-size:1.1rem">📄</span>
+      <span class="fname">${esc(file.name)}</span>
+      <span class="fstatus processing" id="${itemId}-status">Processing…</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="${itemId}-bar" style="width:30%"></div></div>
+  `);
+
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    document.getElementById(itemId+'-bar').style.width = '60%';
+
+    const res = await fetch('/api/upload', {method:'POST', body:fd});
+    const data = await res.json();
+
+    document.getElementById(itemId+'-bar').style.width = '100%';
+
+    if (!res.ok) throw new Error(data.error||'Upload failed');
+
+    document.getElementById(itemId+'-status').textContent = '✓ Added';
+    document.getElementById(itemId+'-status').className = 'fstatus done';
+
+    // Add to state
+    allProps.push(data);
+    document.getElementById('nav-count').textContent = `${allProps.length} properties`;
+    buildCityFilter();
+    applyFilters();
+
+    // Add marker if we have coords
+    if (data.lat && data.lon) {
+      const m = L.marker([data.lat, data.lon], {icon:makeIcon(false)});
+      m.bindPopup(buildPopup(data), {maxWidth:280});
+      m.on('click', ()=>selectProp(data.id));
+      m.addTo(map);
+      markers[data.id] = m;
+    } else {
+      toast(`"${data.name}" added — couldn't extract address, please edit manually`, 'error');
+    }
+
+    toast(`"${data.name}" added to map!`, 'success');
+  } catch(e) {
+    document.getElementById(itemId+'-status').textContent = '✗ Error';
+    document.getElementById(itemId+'-status').className = 'fstatus error';
+    toast(e.message, 'error');
+  }
+}
+
+// ── SIDEBAR TOGGLE ────────────────────────────────────────────────────────────
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+  setTimeout(()=>map.invalidateSize(), 210);
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+function toast(msg, type='success') {
+  const el = document.createElement('div');
+  el.className = `toast-item ${type}`;
+  el.textContent = msg;
+  document.getElementById('toast').appendChild(el);
+  setTimeout(()=>el.remove(), 4000);
+}
+
+// ── UTIL ─────────────────────────────────────────────────────────────────────
+function esc(s='') {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── BOOT ─────────────────────────────────────────────────────────────────────
+loadData();
+</script>
+</body>
+</html>
